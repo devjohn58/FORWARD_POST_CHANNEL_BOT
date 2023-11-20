@@ -11,10 +11,7 @@ bot.command("start", async (ctx: Context) => {
 	try {
 		showBotActivity(ctx, chatId);
 		ctx.reply(
-			`Hello <b>${ctx?.msg?.from?.username}</b>,
-
-I am <b>GrokXAI BOT</b>, and I am delighted to meet you here. We can talk about anything you want, from interesting topics to important matters in life. I am ready to listen and assist you in any way I can.
-Use command /grok { your content } to chat with me.`,
+			`Hello <b>${ctx?.msg?.from?.username}</b>, use /help command to learn use bot!`,
 			{
                 message_thread_id: topicId ?? undefined,
                 parse_mode: "HTML"

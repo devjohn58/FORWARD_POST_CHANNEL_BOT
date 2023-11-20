@@ -35,11 +35,15 @@ try {
 		},
 		{
 			command: "setting",
-			description: "Setting your pannel.",
+			description: "Setting your portal.",
 		},
 		{
 			command: "setup",
 			description: "Setup your portal.",
+		},
+		{
+			command: "help",
+			description: "Instructions on how to use the bot.",
 		},
 	]);
 } catch (error) {

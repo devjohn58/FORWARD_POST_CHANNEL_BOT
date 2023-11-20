@@ -117,10 +117,8 @@ const Setting = new Menu("root-menu")
 			);
 			let isPin = false;
 			if (d && groupId) {
-				console.log("ok1");
 				const dataparse = JSON.parse(d);
 				if (dataparse && dataparse.includes(groupId)) {
-					console.log("ok2");
 					isPin = true;
 				}
 			}
