@@ -72,7 +72,7 @@ bot.on("channel_post", async (ctx) => {
 				d.groupId.forEach((g) => {
                     ctx.api.forwardMessage(g, channelId, messageId).catch(() => { }).then(_ctx => {
                         const messageId = _ctx?.message_id
-                        if (_pin.includes(g) && messageId) {
+                        if (_pin && _pin.includes(g) && messageId) {
                             ctx.api.pinChatMessage(g, _ctx?.message_id, { disable_notification: false }).catch((er) => {console.log("Err Pin: ", er);
                         })
                     }
