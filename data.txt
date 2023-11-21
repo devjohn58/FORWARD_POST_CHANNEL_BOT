@@ -1,1 +1,0 @@
-[{"groupId":[-1002084612738],"channelId":-1002090691550,"channelTitle":"Forward Bot Channel Private"},{"groupId":[],"channelId":435523,"channelTitle":""},{"groupId":[],"channelId":234552356,"channelTitle":""},{"groupId":[],"channelId":53532222,"channelTitle":""},{"groupId":[-1002084612738],"channelId":9889999,"channelTitle":""}]
