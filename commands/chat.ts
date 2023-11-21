@@ -2,8 +2,13 @@
 import { bot } from "..";
 import { showBotActivity } from "../actions/show-bot-activity";
 import { Context } from "grammy";
+import { isStopBot } from "../helper";
 let responseError = "You talk too fast. Please say it again!";
 bot.command("help", async (ctx: Context) => {
+     //down bot
+     if (isStopBot) {
+        return;
+    }
 	const msg = ctx.update.message;
 	const msgId = msg?.message_id;
 	const chatId = msg?.chat.id;

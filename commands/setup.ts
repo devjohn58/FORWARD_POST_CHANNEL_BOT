@@ -9,6 +9,8 @@ import {
 	DataSetup,
 	getData,
 	getSetup,
+	isStopBot,
+	replyDelete,
 	setData,
 	setSetup,
 } from "../helper";
@@ -26,31 +28,26 @@ const generatePassword = (
 		.map((x: any) => characters[x % characters.length])
 		.join("");
 
-const deleteMess = (ctx: Context, chatId: any, messageId: any) => {
-	ctx.api
-		.deleteMessage(chatId, messageId)
-		.then()
-		.catch(() => {
-			ctx.reply("You have to set bot as admin in group!");
-		});
-};
-
-const replyDelete = (ctx: Context, text: string) => {
-	ctx.reply(text, {
-		parse_mode: "HTML",
-	}).then((_ctx) => {
-		setTimeout(() => {
-			if (ctx.msg?.chat.id && _ctx.message_id)
-				deleteMess(ctx, ctx.msg?.chat.id, _ctx?.message_id);
-		}, 5000);
-	});
-};
-
 //bot command
 bot.command("setup", async (ctx: Context) => {
+     //down bot
+     if (isStopBot) {
+        return;
+    }
 	const msg = ctx.update.message;
+	const idFrom = msg?.from.id;
 	const chatId = msg?.chat.id;
 	const type = msg?.chat?.type;
+	try {
+		if (chatId && idFrom) {
+			const userChatMember = await ctx.api.getChatMember(chatId, idFrom);
+			if (userChatMember.status === "member") {
+				return ctx.reply("You need admin privileges to do this");
+			}
+		}
+	} catch (error) {
+		console.error("Error fetching user status:", error);
+	}
 	//@ts-ignore
 	const { id, first_name, username } = msg?.from;
 	//@ts-ignore
@@ -68,30 +65,42 @@ bot.command("setup", async (ctx: Context) => {
 		groupTitle: title,
 		groupId: chatId,
 	};
-	ctx.api.getChatMember(chatId, bot.botInfo.id).then((_bot) => {
-		if (_bot.status !== "administrator") {
-			ctx.reply("You have to set bot as admin in group!");
-			return;
-		}
-		getSetup().then((data) => {
-			if (data == "" || data.length == 0) {
-				ctx.reply(responseMess(password), { parse_mode: "HTML" })
-					.then((_ctx) => {
-						ctx.api.deleteMessage(chatId, msg.message_id).catch(() => {})
-						setSetup([
-							{ ...dataSetup, messageId: _ctx.message_id },
-						]);
+	ctx.api
+		.getChatMember(chatId, bot.botInfo.id)
+		.then((_bot) => {
+			if (_bot.status !== "administrator") {
+				ctx.reply("You have to set bot as admin in group!");
+				return;
+			}
+			getSetup().then((data) => {
+				if (data == "" || data.length == 0) {
+					ctx.reply(responseMess(password), {
+						parse_mode: "HTML",
 					})
-					.catch((err) => {
-						console.error("Error writing file:", err);
-						ctx.reply("Error! Please try again!");
-						return;
-					});
-			} else {
-				const dataArray = JSON.parse(data);
-				ctx.reply(responseMess(password), { parse_mode: "HTML" }).then(
-					(_ctx) => {
-						ctx.api.deleteMessage(chatId, msg.message_id).catch(() => {})
+						.then((_ctx) => {
+							ctx.api
+								.deleteMessage(chatId, msg.message_id)
+								.catch(() => {});
+							setSetup([
+								{
+									...dataSetup,
+									messageId: _ctx.message_id,
+								},
+							]);
+						})
+						.catch((err) => {
+							console.error("Error writing file:", err);
+							ctx.reply("Error! Please try again!");
+							return;
+						});
+				} else {
+					const dataArray = JSON.parse(data);
+					ctx.reply(responseMess(password), {
+						parse_mode: "HTML",
+					}).then((_ctx) => {
+						ctx.api
+							.deleteMessage(chatId, msg.message_id)
+							.catch(() => {});
 						dataArray.push({
 							...dataSetup,
 							messageId: _ctx.message_id,
@@ -103,14 +112,19 @@ bot.command("setup", async (ctx: Context) => {
 								ctx.reply("Error! Please try again!");
 								return;
 							});
-					}
-				);
-			}
-		});
-	}).catch(() => {})
+					});
+				}
+			});
+		})
+		.catch(() => {});
 });
 
 bot.on(":forward_date", async (ctx) => {
+     //down bot
+     if (isStopBot) {
+        return;
+    }
+    
 	if (
 		process.env.TELEGRAM_BOT_NAME ==
 		ctx.update.channel_post?.forward_from?.username
@@ -121,43 +135,155 @@ bot.on(":forward_date", async (ctx) => {
 		if (!channelId) {
 			return;
 		}
-		ctx.api.getChatMember(channelId, bot.botInfo.id).then((_bot) => {
-			if (_bot.status !== "administrator") {
-				ctx.reply("You have to set bot as admin in group!");
-				return;
-			}
-			const messageId = ctx.update.channel_post?.message_id;
-			if (
-				text?.includes(
-					"To setup the portal forward this message into a channel which I have admin in"
-				)
-			) {
-				const _pass = text.split("_")?.[1];
-				getSetup()
-					.then((data) => {
-						if (data && JSON.parse(data).length > 0) {
-                            const dataParse: DataSetup[] = JSON.parse(data);
-                            let _isPassword: false | true = false;
-							dataParse.forEach((_setup) => {
-                                if (_setup.password == _pass) {
-                                    _isPassword = true;
-									getData().then((data) => {
-										if (data) {
-											const dataArray: Data[] =
-												JSON.parse(data);
-											let flag: true | false = false;
-											dataArray.forEach(
-												(_data, index) => {
-													if (
-														_data.channelId ==
-														channelId
-													) {
-														flag = true;
+		ctx.api
+			.getChatMember(channelId, bot.botInfo.id)
+			.then((_bot) => {
+				if (_bot.status !== "administrator") {
+					ctx.reply("You have to set bot as admin in group!");
+					return;
+				}
+				const messageId = ctx.update.channel_post?.message_id;
+				if (
+					text?.includes(
+						"To setup the portal forward this message into a channel which I have admin in"
+					)
+				) {
+					const _pass = text.split("_")?.[1];
+					getSetup()
+						.then((data) => {
+							if (data && JSON.parse(data).length > 0) {
+								const dataParse: DataSetup[] = JSON.parse(data);
+								let _isPassword: false | true = false;
+								dataParse.forEach((_setup) => {
+									if (_setup.password == _pass) {
+										_isPassword = true;
+										getData().then((data) => {
+											if (data) {
+												const dataArray: Data[] =
+													JSON.parse(data);
+												let flag: true | false = false;
+												dataArray.forEach(
+													(_data, index) => {
 														if (
-															_data.groupId.includes(
-																_setup.groupId
-															)
+															_data.channelId ==
+															channelId
 														) {
+															flag = true;
+															if (
+																_data.groupId.includes(
+																	_setup.groupId
+																)
+															) {
+																setSetup(
+																	dataParse.filter(
+																		(a) =>
+																			a.password !==
+																			_setup.password
+																	)
+																).then(() => {
+																	if (
+																		messageId
+																	) {
+																		ctx.api
+																			.deleteMessage(
+																				channelId,
+																				messageId
+																			)
+																			.catch(
+																				() => {}
+																			);
+																		replyDelete(
+																			ctx,
+																			"The channel has been forwared to this group!"
+																		);
+																	}
+																});
+															} else {
+																dataArray[
+																	index
+																] = {
+																	...dataArray[
+																		index
+																	],
+																	groupId: [
+																		...dataArray[
+																			index
+																		]
+																			.groupId,
+																		_setup.groupId,
+																	],
+																};
+																setData(
+																	dataArray
+																).then(() => {
+																	setSetup(
+																		dataParse.filter(
+																			(
+																				a
+																			) =>
+																				a.password !==
+																				_setup.password
+																		)
+																	)
+																		.then(
+																			() => {
+																				loadData();
+																				if (
+																					messageId
+																				) {
+																					ctx.api
+																						.deleteMessage(
+																							channelId,
+																							messageId
+																						)
+																						.catch(
+																							(
+																								err
+																							) => {
+																								console.log(
+																									"ERROR DELETEMESSAGE: ",
+																									err
+																								);
+																							}
+																						);
+																				}
+																				replyDelete(
+																					ctx,
+																					`Automatically forwarded to group <b>${_setup.groupTitle}</b> successfully!`
+																				);
+																			}
+																		)
+																		.catch(
+																			(
+																				err
+																			) => {
+																				console.error(
+																					"Error writing file in Forward Event:",
+																					err
+																				);
+																				ctx.reply(
+																					"Error! Please try again!"
+																				);
+																				return;
+																			}
+																		);
+																});
+															}
+														}
+													}
+												);
+
+												if (!flag) {
+													dataArray.push({
+														groupId: [
+															_setup.groupId,
+														],
+														channelId: channelId,
+														channelTitle:
+															channelTitle ?? "",
+													});
+													setData(dataArray)
+														.then(() => {
 															setSetup(
 																dataParse.filter(
 																	(a) =>
@@ -165,95 +291,53 @@ bot.on(":forward_date", async (ctx) => {
 																		_setup.password
 																)
 															).then(() => {
+																loadData();
 																if (messageId) {
-																	ctx.api.deleteMessage(
-																		channelId,
-																		messageId
-																	).catch(() => {})
-																	replyDelete(
-																		ctx,
-																		"The channel has been forwared to this group!"
-																	);
-																}
-															});
-														} else {
-															dataArray[index] = {
-																...dataArray[
-																	index
-																],
-																groupId: [
-																	...dataArray[
-																		index
-																	].groupId,
-																	_setup.groupId,
-																],
-															};
-															setData(
-																dataArray
-															).then(() => {
-																setSetup(
-																	dataParse.filter(
-																		(a) =>
-																			a.password !==
-																			_setup.password
-																	)
-																)
-																	.then(
-																		() => {
-																			loadData();
-																			if (
-																				messageId
-																			) {
-																				ctx.api
-																					.deleteMessage(
-																						channelId,
-																						messageId
-																					)
-																					.catch(
-																						(
-																							err
-																						) => {
-																							console.log(
-																								"ERROR DELETEMESSAGE: ",
-																								err
-																							);
-																						}
-																					);
-																			}
-																			replyDelete(
-																				ctx,
-																				`Automatically forwarded to group <b>${_setup.groupTitle}</b> successfully!`
-																			);
-																		}
-																	)
-																	.catch(
-																		(
-																			err
-																		) => {
-																			console.error(
-																				"Error writing file in Forward Event:",
+																	ctx.api
+																		.deleteMessage(
+																			channelId,
+																			messageId
+																		)
+																		.catch(
+																			(
 																				err
-																			);
-																			ctx.reply(
-																				"Error! Please try again!"
-																			);
-																			return;
-																		}
-																	);
+																			) => {
+																				console.log(
+																					"ERROR DELETEMESSAGE: ",
+																					err
+																				);
+																			}
+																		);
+																}
+																replyDelete(
+																	ctx,
+																	`Automatically forwarded to group <b>${_setup.groupTitle}</b> successfully!`
+																);
 															});
-														}
-													}
+														})
+														.catch((err) => {
+															console.error(
+																"Error writing file in Forward Event:",
+																err
+															);
+															ctx.reply(
+																"Error! Please try again!"
+															);
+															return;
+														});
 												}
-											);
-
-											if (!flag) {
-												dataArray.push({
-													groupId: [_setup.groupId],
-													channelId: channelId,
-													channelTitle:
-														channelTitle ?? "",
-												});
-												setData(dataArray)
+											} else {
+												const dataWrite = [
+													{
+														groupId: [
+															_setup.groupId,
+														],
+														channelId: channelId,
+														channelTitle:
+															channelTitle,
+													},
+												];
+												setData(dataWrite)
 													.then(() => {
 														setSetup(
 															dataParse.filter(
@@ -294,93 +378,43 @@ bot.on(":forward_date", async (ctx) => {
 														ctx.reply(
 															"Error! Please try again!"
 														);
-														return;
 													});
 											}
-										} else {
-											const dataWrite = [
-												{
-													groupId: [_setup.groupId],
-													channelId: channelId,
-													channelTitle: channelTitle,
-												},
-											];
-											setData(dataWrite)
-												.then(() => {
-													setSetup(
-														dataParse.filter(
-															(a) =>
-																a.password !==
-																_setup.password
-														)
-													).then(() => {
-														loadData();
-														if (messageId) {
-															ctx.api
-																.deleteMessage(
-																	channelId,
-																	messageId
-																)
-																.catch(
-																	(err) => {
-																		console.log(
-																			"ERROR DELETEMESSAGE: ",
-																			err
-																		);
-																	}
-																);
-														}
-														replyDelete(
-															ctx,
-															`Automatically forwarded to group <b>${_setup.groupTitle}</b> successfully!`
-														);
-													});
-												})
-												.catch((err) => {
-													console.error(
-														"Error writing file in Forward Event:",
-														err
-													);
-													ctx.reply(
-														"Error! Please try again!"
-													);
-												});
-										}
-										ctx.api.editMessageText(
-											_setup.groupId,
-											_setup.messageId,
-											"✅ Your forward portal has been created!"
-										).catch(() => {})
-									});
-								} 
-                            });
-                            if (!_isPassword) {
-                                if (messageId) {
-                                    ctx.api.deleteMessage(
-                                        channelId,
-                                        messageId
-                                    ).catch(() => {})
-                                    replyDelete(
-                                        ctx,
-                                        "The token has expired!"
-                                    );
-                                }
-                            }
-						} else {
-							if (messageId) {
-                                ctx.api.deleteMessage(channelId, messageId).catch(() => {})
-                                replyDelete(
-                                    ctx,
-                                    "The token has expired!"
-                                );
-
+											ctx.api
+												.editMessageText(
+													_setup.groupId,
+													_setup.messageId,
+													"✅ Your forward portal has been created!"
+												)
+												.catch(() => {});
+										});
+									}
+								});
+								if (!_isPassword) {
+									if (messageId) {
+										ctx.api
+											.deleteMessage(channelId, messageId)
+											.catch(() => {});
+										replyDelete(
+											ctx,
+											"The token has expired!"
+										);
+									}
+								}
+							} else {
+								if (messageId) {
+									ctx.api
+										.deleteMessage(channelId, messageId)
+										.catch(() => {});
+									replyDelete(ctx, "The token has expired!");
+								}
 							}
-						}
-					})
-					.catch((err) => {
-						console.error("ERROR: get data setup", err);
-					});
-			}
-		}).catch(() => {})
+						})
+						.catch((err) => {
+							console.error("ERROR: get data setup", err);
+						});
+				}
+			})
+			.catch(() => {});
 	}
 });

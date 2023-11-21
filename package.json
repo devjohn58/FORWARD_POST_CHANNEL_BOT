@@ -12,6 +12,7 @@
     "crypto": "^1.0.1",
     "dotenv": "^16.0.1",
     "grammy": "^1.14.1",
+    "grammy-middlewares": "^1.0.11",
     "isomorphic-unfetch": "^4.0.2",
     "node-cache": "^5.1.2",
     "openai": "^4.17.0",

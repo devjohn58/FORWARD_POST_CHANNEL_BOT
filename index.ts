@@ -1,16 +1,19 @@
-import { Bot as TelegramBot } from "grammy";
+import { Composer, Context, NextFunction, Bot as TelegramBot } from "grammy";
 import * as dotenv from "dotenv";
+import { onlyAdmin } from "grammy-middlewares";
 import { showBotActivity } from "./actions/show-bot-activity";
 import fs from "fs";
 import path from "path";
 dotenv.config();
+
+const term = require("terminal-kit").terminal;
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
 	throw new Error("TELEGRAM_BOT_TOKEN env variable is not defined");
 }
 export const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
 import "./commands";
-import { Data } from "./helper";
+import { Data, isStopBot } from "./helper";
 
 export let _data: null | Data[] = null;
 export let _pin: any = null;
@@ -49,9 +52,6 @@ try {
 } catch (error) {
 	console.error("[Error] Could not set bot commands.", error);
 }
-bot.start().catch((error) => {
-	console.error("[Error] Could not start bot.", error);
-});
 
 const textCheck = [
 	"The channel has been forwared to this group!",
@@ -60,6 +60,10 @@ const textCheck = [
 ];
 
 bot.on("channel_post", async (ctx) => {
+    //down bot
+    if (isStopBot) {
+        return;
+    }
 	if (!ctx.msg) return;
 	// term.yellow(JSON.stringify(ctx, null, 2) + '\n');
 	const channelId = ctx.update.channel_post?.sender_chat?.id;
@@ -67,22 +71,38 @@ bot.on("channel_post", async (ctx) => {
 	const chatId = ctx.msg.chat.id;
 	const text = ctx.update.channel_post?.text;
 	if (text && textCheck.includes(text)) return;
-		_data?.forEach((d) => {
-			if (channelId == d.channelId) {
-				d.groupId.forEach((g) => {
-                    ctx.api.forwardMessage(g, channelId, messageId).catch(() => { }).then(_ctx => {
-                        const messageId = _ctx?.message_id
-                        if (_pin && _pin.includes(g) && messageId) {
-                            ctx.api.pinChatMessage(g, _ctx?.message_id, { disable_notification: false }).catch((er) => {console.log("Err Pin: ", er);
-                        })
-                    }
-                })
-				});
-				return;
-			}
-		});
-		showBotActivity(ctx, chatId);
+	_data?.forEach((d) => {
+		if (channelId == d.channelId) {
+			d.groupId.forEach((g) => {
+				ctx.api
+					.forwardMessage(g, channelId, messageId)
+					.catch(() => {})
+					.then((_ctx) => {
+						const messageId = _ctx?.message_id;
+						if (_pin && _pin.includes(g) && messageId) {
+							ctx.api
+								.pinChatMessage(g, _ctx?.message_id, {
+									disable_notification: false,
+								})
+								.catch((er) => {
+									console.log("Err Pin: ", er);
+								});
+						}
+					});
+			});
+			return;
+		}
+	});
+	showBotActivity(ctx, chatId);
 });
 loadData();
 loadPin();
+bot.start().catch((error) => {
+	console.error("[Error] Could not start bot.", error);
+});
+
 console.log("Bot is running....");
+bot.catch((err) => {
+    const ctx = err.ctx;
+    console.error(`Error Index Catch:`, err);
+  });

@@ -1,8 +1,13 @@
 import { bot } from "..";
 import { Context } from "grammy";
 import { showBotActivity } from "../actions/show-bot-activity";
+import { isStopBot } from "../helper";
 
 bot.command("start", async (ctx: Context) => {
+     //down bot
+     if (isStopBot) {
+        return;
+    }
 	if (!ctx.msg) return;
 	const chatId = ctx?.msg?.chat.id;
 	const privateChat = ctx?.msg?.chat.type === "private";
